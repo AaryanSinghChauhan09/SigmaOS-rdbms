@@ -59,7 +59,8 @@ pub fn quote_qualified(dialect: Dialect, name: &str) -> Result<String, RdbmsErro
     if parts.iter().any(|p| p.is_empty()) {
         return Err(RdbmsError::InvalidIdentifier(name.to_string()));
     }
-    parts.iter()
+    parts
+        .iter()
         .map(|p| quote_ident(dialect, p))
         .collect::<Result<Vec<_>, _>>()
         .map(|v| v.join("."))
@@ -89,10 +90,16 @@ pub fn parse_conn_string(s: &str) -> Result<ConnParams, RdbmsError> {
     let bytes = s.as_bytes();
     let mut i = 0usize;
     while i < bytes.len() {
-        while i < bytes.len() && bytes[i].is_ascii_whitespace() { i += 1; }
-        if i >= bytes.len() { break; }
+        while i < bytes.len() && bytes[i].is_ascii_whitespace() {
+            i += 1;
+        }
+        if i >= bytes.len() {
+            break;
+        }
         let start = i;
-        while i < bytes.len() && bytes[i] != b'=' && !bytes[i].is_ascii_whitespace() { i += 1; }
+        while i < bytes.len() && bytes[i] != b'=' && !bytes[i].is_ascii_whitespace() {
+            i += 1;
+        }
         if i >= bytes.len() || bytes[i] != b'=' {
             return Err(RdbmsError::BadConnString(s.to_string()));
         }
@@ -104,16 +111,22 @@ pub fn parse_conn_string(s: &str) -> Result<ConnParams, RdbmsError> {
             while i < bytes.len() {
                 if bytes[i] == b'\'' {
                     if i + 1 < bytes.len() && bytes[i + 1] == b'\'' {
-                        v.push('\''); i += 2; continue;
+                        v.push('\'');
+                        i += 2;
+                        continue;
                     }
-                    i += 1; break;
+                    i += 1;
+                    break;
                 }
-                v.push(bytes[i] as char); i += 1;
+                v.push(bytes[i] as char);
+                i += 1;
             }
             v
         } else {
             let vs = i;
-            while i < bytes.len() && !bytes[i].is_ascii_whitespace() { i += 1; }
+            while i < bytes.len() && !bytes[i].is_ascii_whitespace() {
+                i += 1;
+            }
             s[vs..i].to_string()
         };
         match key {
@@ -122,7 +135,9 @@ pub fn parse_conn_string(s: &str) -> Result<ConnParams, RdbmsError> {
             "dbname" | "database" => p.database = Some(value),
             "user" => p.user = Some(value),
             "password" => p.password = Some(value),
-            _ => { p.extra.insert(key.to_string(), value); }
+            _ => {
+                p.extra.insert(key.to_string(), value);
+            }
         }
     }
     Ok(p)
@@ -132,12 +147,24 @@ pub fn parse_conn_string(s: &str) -> Result<ConnParams, RdbmsError> {
 /// caller is responsible for not logging the result).
 pub fn build_conn_string(p: &ConnParams) -> String {
     let mut parts = Vec::new();
-    if let Some(h) = &p.host { parts.push(format!("host={h}")); }
-    if let Some(port) = p.port { parts.push(format!("port={port}")); }
-    if let Some(d) = &p.database { parts.push(format!("dbname={d}")); }
-    if let Some(u) = &p.user { parts.push(format!("user={u}")); }
-    if let Some(pw) = &p.password { parts.push(format!("password={}", quote_value(pw))); }
-    for (k, v) in &p.extra { parts.push(format!("{k}={}", quote_value(v))); }
+    if let Some(h) = &p.host {
+        parts.push(format!("host={h}"));
+    }
+    if let Some(port) = p.port {
+        parts.push(format!("port={port}"));
+    }
+    if let Some(d) = &p.database {
+        parts.push(format!("dbname={d}"));
+    }
+    if let Some(u) = &p.user {
+        parts.push(format!("user={u}"));
+    }
+    if let Some(pw) = &p.password {
+        parts.push(format!("password={}", quote_value(pw)));
+    }
+    for (k, v) in &p.extra {
+        parts.push(format!("{k}={}", quote_value(v)));
+    }
     parts.join(" ")
 }
 
@@ -155,15 +182,27 @@ mod tests {
 
     #[test]
     fn quotes_per_dialect() {
-        assert_eq!(quote_ident(Dialect::Postgres, "my table").unwrap(), "\"my table\"");
-        assert_eq!(quote_ident(Dialect::MySql, "weird`name").unwrap(), "`weird``name`");
+        assert_eq!(
+            quote_ident(Dialect::Postgres, "my table").unwrap(),
+            "\"my table\""
+        );
+        assert_eq!(
+            quote_ident(Dialect::MySql, "weird`name").unwrap(),
+            "`weird``name`"
+        );
         assert_eq!(quote_ident(Dialect::SqlServer, "a]b").unwrap(), "[a]]b]");
-        assert_eq!(quote_qualified(Dialect::Postgres, "public.users").unwrap(), "\"public\".\"users\"");
+        assert_eq!(
+            quote_qualified(Dialect::Postgres, "public.users").unwrap(),
+            "\"public\".\"users\""
+        );
     }
 
     #[test]
     fn parses_conn_string() {
-        let p = parse_conn_string("host=db.local port=5432 dbname=app user=alice password='p@ss word' sslmode=require").unwrap();
+        let p = parse_conn_string(
+            "host=db.local port=5432 dbname=app user=alice password='p@ss word' sslmode=require",
+        )
+        .unwrap();
         assert_eq!(p.host.as_deref(), Some("db.local"));
         assert_eq!(p.port, Some(5432));
         assert_eq!(p.database.as_deref(), Some("app"));
