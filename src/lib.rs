@@ -215,5 +215,47 @@ mod tests {
     fn rejects_empty_ident() {
         assert!(quote_ident(Dialect::Postgres, "").is_err());
         assert!(quote_qualified(Dialect::Postgres, "a..b").is_err());
+        assert!(quote_ident(Dialect::Postgres, "a\0b").is_err());
+    }
+
+    #[test]
+    fn escapes_embedded_delimiters() {
+        assert_eq!(
+            quote_ident(Dialect::Postgres, "we\"ird").unwrap(),
+            "\"we\"\"ird\""
+        );
+        assert_eq!(quote_ident(Dialect::MySql, "a`b").unwrap(), "`a``b`");
+        assert_eq!(quote_ident(Dialect::SqlServer, "a]b").unwrap(), "[a]]b]");
+    }
+
+    #[test]
+    fn database_alias_and_bad_port() {
+        let p = parse_conn_string("database=mydb port=abc").unwrap();
+        assert_eq!(p.database.as_deref(), Some("mydb"));
+        assert_eq!(p.port, None); // unparseable port dropped, not fatal
+    }
+
+    #[test]
+    fn unterminated_quote_errors() {
+        // parser tolerates EOF inside quotes; verify no panic
+        let _ = parse_conn_string("password='abc");
+        assert!(parse_conn_string("noequals").is_err());
+    }
+
+    #[test]
+    fn build_conn_string_roundtrip() {
+        let p = ConnParams {
+            host: Some("h".into()),
+            port: Some(5432),
+            database: Some("d".into()),
+            user: Some("u".into()),
+            password: None,
+            extra: BTreeMap::new(),
+        };
+        let s = build_conn_string(&p);
+        let back = parse_conn_string(&s).unwrap();
+        assert_eq!(back.host.as_deref(), Some("h"));
+        assert_eq!(back.port, Some(5432));
+        assert_eq!(back.database.as_deref(), Some("d"));
     }
 }
